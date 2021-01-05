@@ -4,7 +4,7 @@
 
 ;; Author: Alpha Catharsis <alpha.catharsis@gmail.com>
 ;; Maintainer: Alpha Catharsis <alpha.catharsis@gmail.com>
-;; Version: 0.0.1
+;; Version: 1.0.0
 ;; Keywords: linux
 ;; URL: https://github.com/alpha-catharsis/alpha-sudo.el
 ;; Package-Requires: ()
@@ -55,19 +55,20 @@
     (list (apply 'call-process program nil (current-buffer) nil args)
           (buffer-string))))
 
-(defun alpha--shell-command-async (name command sentinel)
+(defun alpha--shell-command-async (program command sentinel)
   "Run shell command COMMAND asyncronously and call function FUNC.
-The function has as parameters the name NAME, the command exit code and
+The function has as parameters the name PROGRAM, the command exit code and
 the command output."
-  (make-process :name name
-                :buffer (generate-new-buffer-name (concat "*sudo-" name "*"))
+  (make-process :name program
+                :buffer (generate-new-buffer-name
+                         (concat "*sudo-" program "*"))
                 :command (list (alpha--user-shell) "-c" command)
                 :stderr nil
                 :sentinel (lambda (process _event)
                             (let ((exitcode (process-exit-status process))
                                   (buffer (process-buffer process)))
                               (with-current-buffer buffer
-                                (funcall sentinel name
+                                (funcall sentinel program
                                          exitcode (buffer-string)))
                               (kill-buffer buffer)))))
 
@@ -89,9 +90,9 @@ Return nil if the program does not exist."
 
 ;; Internal alpha-sudo functions
 
-(defun alpha-sudo--interactive-sentinel (name exitcode output)
+(defun alpha-sudo--interactive-sentinel (program exitcode output)
   "Handle the result of an interactive sudo command."
-  (with-current-buffer (generate-new-buffer (concat "*sudo-" name "*"))
+  (with-current-buffer (generate-new-buffer (concat "*sudo-" program "*"))
     (when (/= 0 exitcode)
       (insert (format "Processe exited with error code: %d\n" exitcode)))
     (insert output)
@@ -109,27 +110,27 @@ Return nil if the program does not exist."
   "Return the path to sudo."
   (alpha--shell-program-path "sudo"))
 
-(defun alpha-can-sudo-p (command)
-  "Check if user can run COMMAND with sudo."
+(defun alpha-sudo-can-p (program)
+  "Check if user can run PROGRAM with sudo."
   (let ((sudo-path (alpha-sudo-path)))
     (if sudo-path
-        (let ((result (alpha--call-process sudo-path "-l" command)))
+        (let ((result (alpha--call-process sudo-path "-l" program)))
           (= 0 (car result)))
       nil)))
 
-(defun alpha-require-sudo-password-p (command)
-  "Check if password is needed for running COMMAND with sudo."
-  (when (not (alpha-can-sudo-p command))
-    (error "User cannot execute command `%s' via sudo" command))
-  (let ((cmd-with-passwd (alist-get 'nopasswd (alpha-sudo-allowed-commands))))
+(defun alpha-sudo-require-password-p (program)
+  "Check if password is needed for running PROGRAM with sudo."
+  (when (not (alpha-sudo-can-p program))
+    (error "User cannot execute program `%s' via sudo" program))
+  (let ((cmd-with-passwd (alist-get 'nopasswd (alpha-sudo-allowed-programs))))
     (not (or (string= (car cmd-with-passwd) "ALL")
-             (member command cmd-with-passwd)))))
+             (member program cmd-with-passwd)))))
 
-(defun alpha-sudo-allowed-commands ()
-    "Return the commands that the user can execute with sudo.
-The results is an alist containing with key 'nopasswd the commands that can be
-executed withouth password and with key 'passwd the commands that requiring
-password. \"ALL\" indicates that the user can run all commands."
+(defun alpha-sudo-allowed-programs ()
+    "Return the programs that the user can execute with sudo.
+The results is an alist containing with key 'nopasswd the programs that can be
+executed withouth password and with key 'passwd the programs that requiring
+password. \"ALL\" indicates that the user can run all programs."
     (let ((sudo-path (alpha-sudo-path)))
       (if sudo-path
           (let ((sudo-result (alpha--call-process sudo-path "-nl"))
@@ -140,7 +141,7 @@ password. \"ALL\" indicates that the user can run all commands."
                     (let ((fields (split-string line)))
                       (when (or (string= (car fields) "(ALL)")
                                 (string= (car fields) "(root)"))
-                        (let ((commands
+                        (let ((programs
                                (mapcar (lambda (x)
                                          (replace-regexp-in-string "," "" x))
                                        (cdr fields))))
@@ -148,10 +149,10 @@ password. \"ALL\" indicates that the user can run all commands."
                               (setq result
                                     (append result
                                             (list
-                                             (cons 'nopasswd (cdr commands)))))
+                                             (cons 'nopasswd (cdr programs)))))
                             (setq result
                                   (append result
-                                          (list (cons 'passwd commands))))))))))
+                                          (list (cons 'passwd programs))))))))))
               nil))
         nil)))
 
@@ -166,7 +167,7 @@ Password PASSWORD can be passed as optional argument."
                                            (shell-quote-argument password)
                                            " | "
                                            (alpha-sudo-path)
-                                           " -S "
+                                           " -S -p \"\" "
                                            command)
                                    sentinel)
       (alpha--shell-command-async progname
@@ -180,9 +181,9 @@ The password is requested only if needed."
   (let ((real-cmd (alpha--shell-program-full-path
                    (car (split-string command)))))
     (if (not (and real-cmd
-                  (alpha-can-sudo-p real-cmd)))
+                  (alpha-sudo-can-p real-cmd)))
         (error "Cannot exectute command `%s' via sudo" command)
-      (if (alpha-require-sudo-password-p real-cmd)
+      (if (alpha-sudo-require-password-p real-cmd)
           (alpha-sudo-exec command #'alpha-sudo--interactive-sentinel
                       (read-passwd "Enter password: "))
         (alpha-sudo-exec command #'alpha-sudo--interactive-sentinel)))))
