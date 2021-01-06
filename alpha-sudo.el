@@ -168,7 +168,8 @@ Password PASSWORD can be passed as optional argument."
                                                    " -S -p \"\" "
                                                    command)
                                            sentinel)))
-          (process-send-string process (concat password "\n")))
+          (process-send-string process (concat password "\n"))
+          process)
       (alpha--shell-command-async progname
                                  (concat (alpha-sudo-path) " -n " command)
                                  sentinel))))
