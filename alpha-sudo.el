@@ -158,7 +158,7 @@ password. \"ALL\" indicates that the user can run all programs."
         nil)))
 
 (defun alpha-sudo-exec (command sentinel &optional password)
-  "Execute shell command COMMAND as root via SUDO.
+  "Execute shell command COMMAND asynchronously as root via SUDO.
 At the end of the execution the SENTINEL function is called.
 Password PASSWORD can be passed as optional argument."
   (let ((progname (car (split-string command))))
@@ -175,6 +175,31 @@ Password PASSWORD can be passed as optional argument."
       (alpha--shell-command-async progname
                                  (concat (alpha-sudo-path) " -n " command)
                                  sentinel))))
+
+(defun alpha-sudo-exec-sync (command &optional password)
+  "Execute shell command COMMAND synchronously as root via SUDO.
+Password PASSWORD can be passed as optional argument.
+The function returns a list of two elements: the process exit code
+and its output. Warning: this function will freeze Emacs for roughly
+two seconds if a wrong password is provided."
+  (with-temp-buffer
+    (let ((exitcode
+           (if password
+               (progn
+                 (insert password)
+                 (call-shell-region (point-min)
+                                    (point-max)
+                                    (concat (alpha-sudo-path)
+                                            " -S -p \"\" "
+                                            command)
+                                    t
+                                    t))
+             (call-process-shell-command
+              (concat (alpha-sudo-path) " -n " command)
+              nil
+              t
+              nil))))
+      (list exitcode (buffer-string)))))
 
 (defun alpha-sudo-shell-command (command)
   "Execute shell command COMMAND as root via sudo.
