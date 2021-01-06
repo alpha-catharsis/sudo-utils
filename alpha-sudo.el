@@ -162,14 +162,13 @@ At the end of the execution the SENTINEL function is called.
 Password PASSWORD can be passed as optional argument."
   (let ((progname (car (split-string command))))
     (if password
-        (alpha--shell-command-async progname
-                                   (concat "/bin/echo "
-                                           (shell-quote-argument password)
-                                           " | "
-                                           (alpha-sudo-path)
-                                           " -S -p \"\" "
-                                           command)
-                                   sentinel)
+        (let ((process
+               (alpha--shell-command-async progname
+                                           (concat (alpha-sudo-path)
+                                                   " -S -p \"\" "
+                                                   command)
+                                           sentinel)))
+          (process-send-string process (concat password "\n")))
       (alpha--shell-command-async progname
                                  (concat (alpha-sudo-path) " -n " command)
                                  sentinel))))
