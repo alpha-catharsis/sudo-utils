@@ -63,6 +63,7 @@ the command output."
                 :buffer (generate-new-buffer-name
                          (concat "*sudo-" program "*"))
                 :command (list (alpha--user-shell) "-c" command)
+                :connection-type 'pipe
                 :stderr nil
                 :sentinel (lambda (process _event)
                             (let ((exitcode (process-exit-status process))
@@ -94,7 +95,7 @@ Return nil if the program does not exist."
   "Handle the result of an interactive sudo command."
   (with-current-buffer (generate-new-buffer (concat "*sudo-" program "*"))
     (when (/= 0 exitcode)
-      (insert (format "Processe exited with error code: %d\n" exitcode)))
+      (insert (format "Process exited with error code: %d\n" exitcode)))
     (insert output)
     (if (> (count-lines (point-min) (point-max)) 5)
         (progn
@@ -168,7 +169,9 @@ Password PASSWORD can be passed as optional argument."
                                                    " -S -p \"\" "
                                                    command)
                                            sentinel)))
-          (process-send-string process (concat password "\n")))
+          (process-send-string process (concat password "\n"))
+          (process-send-eof process)
+          process)
       (alpha--shell-command-async progname
                                  (concat (alpha-sudo-path) " -n " command)
                                  sentinel))))
