@@ -1,26 +1,26 @@
 # Introduction
 
-This package provides some useful interactive and non-interactive
+This package provides some useful interactive and non-interactive 
 functions for working with *sudo* shell program.
 
 ## Quickstart
 
-Just invoke ```alpha-sudo-shell-command``` command through ```M-x``` to
+Just invoke ```alpha-sudo-shell-command``` command through ```M-x``` to 
 execute a shell command via sudo. 
 
 ## API
 
 This package exposes the following functions:
 
-* ```(alpha-sudo-shell-command COMMAND)```. This interactive function prompt
-for the shell COMMAND to be executed via sudo. Additionally, if sudo requires
-a password for the specified COMMAND, it also prompt the user for his password.
-Then it executes the COMMAND via sudo and display the result in the minibuffer
-or in a separate buffer, depending on lenght of the output.
+* ```(alpha-sudo-shell-command COMMAND)```. This interactive function prompt 
+for the shell COMMAND to be executed via sudo. Additionally, if sudo requires 
+a password for the specified COMMAND, it also prompt the user for his password. 
+Then it executes the COMMAND via sudo asynchronously and displays the result 
+in the minibuffer or in a separate buffer, depending on lenght of the output.
 
 * ```(alpha-sudo-exec COMMAND SENTINEL &optional PASSWORD)```. This
-non-interactive function executes the shell COMMAND via sudo. If
-user PASSWORD is required to execute COMMAND via sudo, it shall be 
+non-interactive function executes the shell COMMAND asynchronously via sudo.
+If user PASSWORD is required to execute COMMAND via sudo, it shall be 
 provided as optional argument. At the end of the command exectution, the 
 SENTINEL function is called. The sentinel function has signature 
 ```(sentinel PROGRAM EXITCODE OUTPUT)``` where:
@@ -31,6 +31,14 @@ SENTINEL function is called. The sentinel function has signature
 
     * OUTPUT is a string obtained by merging program stardard output and
     standard error
+
+* ```(alpha-sudo-exec-sync COMMAND &optional PASSWORD)```. This non-interative
+function executes the shell COMMAND synchronously via sudo. If user PASSWORD is
+required to execute COMMAND via sudo, it shall be provided as optional
+argument. This function returns a list with two elements: the process exit
+code and the process output. **WARNING:** this function frezzes Emacs for
+few seconds if the user password is required and the provided password is
+incorrect.
 
 * ```(alpha-sudo-allowed-programs)```. This non-interactive function returns an
 alist with two keys:
