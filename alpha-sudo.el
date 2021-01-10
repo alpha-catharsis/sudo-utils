@@ -1,13 +1,13 @@
-;;; alpha-sudo.el --- Sudo utilities for emacs -*- lexical-binding: t; -*-
+;;; alpha-sudo.el --- Sudo utilities -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2021 Alpha Catharsis
 
 ;; Author: Alpha Catharsis <alpha.catharsis@gmail.com>
 ;; Maintainer: Alpha Catharsis <alpha.catharsis@gmail.com>
 ;; Version: 2.0.0
-;; Keywords: linux
+;; Keywords: processes, unix
 ;; URL: https://github.com/alpha-catharsis/alpha-sudo.el
-;; Package-Requires: ()
+;; Package-Requires: ((emacs "25.1"))
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -44,14 +44,14 @@
 
 ;; Internal generic functions
 
-(defun alpha-user-shell-abs-path ()
+(defun alpha-sudo--user-shell-abs-path ()
   "Return the absolute path of user shell program.
 If the absolute path of the uher shell program cannot be retrieved
 from environmental variables then'/bin/sh' is returned."
   (let ((shell (getenv "SHELL")))
     (or shell "/bin/sh")))
 
-(defun alpha-exec-program-sync (program &optional instr &rest args)
+(defun alpha-sudo--exec-program-sync (program &optional instr &rest args)
   "Run the program PROGRAM with arguments ARGS synchronously.
 Returns a list containing the program exit code and output as string.
 String INSTR, if not nil, is passed as program standard input."
@@ -65,7 +65,8 @@ String INSTR, if not nil, is passed as program standard input."
        (apply #'call-process program nil (current-buffer) nil args))
      (string-trim-right (buffer-string)))))
 
-(defun alpha-exec-program-async (program &optional callback instr &rest args)
+(defun alpha-sudo--exec-program-async (program &optional callback instr
+                                               &rest args)
   "Run the program PROGRAM with arguments ARGS asynchronously.
 When program terminates the CALLBACK function is called if not nil. The
 CALLBACK function receives as arguments the program exit code and output buffer.
@@ -88,35 +89,34 @@ String INSTR, if not nil, is passed as program standard input."
       (process-send-string process (concat instr "\n"))
       (process-send-eof process))))
 
-(defun alpha-shell-command-sync (command &optional instr shell)
+(defun alpha-sudo--shell-command-sync (command &optional instr shell)
   "Run shell command COMMAND with shell SHELL synchronously.
 Return a list containing the command exit code and output as string.
 String INSTR, if not nil, is passed as command standard input.
 If SHELL is not provided, the user default shell is used."
-  (apply #'alpha-exec-program-sync
+  (apply #'alpha-sudo--exec-program-sync
          (list
-          (or shell (alpha-user-shell-abs-path)) instr "-c" command)))
+          (or shell (alpha-sudo--user-shell-abs-path)) instr "-c" command)))
 
-(defun alpha-shell-command-async (command &optional callback instr shell)
+(defun alpha-sudo--shell-command-async (command &optional callback instr shell)
   "Run the shell command COMMAND with shell SHELL asynchronously.
 When command terminates the CALLBACK function is called if not nil. The
 CALLBACK function receives as arguments the command exit code and output buffer.
 String INSTR, if not nil, is passed as command standard input.
 If SHELL is not provided, the user default shell is used."
-
-  (apply #'alpha-exec-program-async
+  (apply #'alpha-sudo--exec-program-async
          (list
-          (or shell (alpha-user-shell-abs-path))
+          (or shell (alpha-sudo--user-shell-abs-path))
           callback instr "-c" command)))
 
-(defun alpha-program-abs-path (program)
+(defun alpha-sudo--program-abs-path (program)
   "Return the absolute path of program PROGRAM.
 It looks also in directories listed in user $PATH environmente variable.
 If program cannot be found, it returns nil."
   (let ((abs-path
          (if (file-name-absolute-p program)
              program
-           (let ((result (alpha-exec-program-sync "which" nil program)))
+           (let ((result (alpha-sudo--exec-program-sync "which" nil program)))
              (if (= 0 (car result))
                  (cadr result)
                (expand-file-name (cadr result)))))))
@@ -124,7 +124,7 @@ If program cannot be found, it returns nil."
 
 ;; Internal alpha-sudo specific functions
 
-(defun alpha-display-result-cb (exitcode buffer)
+(defun alpha-sudo--display-result-cb (exitcode buffer)
   "Handle the result of an asynchronous interactive sudo command.
 It utilizes EXITCODE and BUFFER to display the command output in the
 other window."
@@ -148,7 +148,7 @@ other window."
 
 (defun alpha-sudo-abs-path ()
   "Return the absolute path to sudo."
-  (alpha-program-abs-path "sudo"))
+  (alpha-sudo--program-abs-path "sudo"))
 
 (defun alpha-sudo-can-run-p ()
   "Check if user can run sudo."
@@ -156,7 +156,7 @@ other window."
     (and sudo-path
          (not (string-match-p
                "may not run sudo on"
-               (cadr (alpha-exec-program-sync sudo-path nil "-vn")))))))
+               (cadr (alpha-sudo--exec-program-sync sudo-path nil "-vn")))))))
 
 (defun alpha-sudo-can-run-program-p (program &optional password)
   "Check if user can run PROGRAM with sudo.
@@ -165,7 +165,7 @@ possible to determine if the user can run the program with sudo. If user
 password PASSWORD is provided the result is always known."
   (and (alpha-sudo-can-run-p)
        (let* ((flags (if password "-lS" "-ln"))
-              (result (alpha-exec-program-sync (alpha-sudo-abs-path)
+              (result (alpha-sudo--exec-program-sync (alpha-sudo-abs-path)
                         password flags program)))
          (if (= 0 (car result))
              t (if (string-match-p "a password is required" (cadr result))
@@ -185,7 +185,7 @@ If user password PASSWORD is provided the result known."
       (let ((cmd-without-passwd
              (alist-get 'nopasswd (alpha-sudo-allowed-programs))))
         (not (or (string= (car cmd-without-passwd) "ALL")
-                 (member (alpha-program-abs-path program)
+                 (member (alpha-sudo--program-abs-path program)
                          cmd-without-passwd))))))))
 
 (defun alpha-sudo-allowed-programs (&optional password)
@@ -197,7 +197,8 @@ The returned list can be empty of password PASSWORD is not provided."
     (let ((sudo-path (alpha-sudo-abs-path))
           (flags (if password "-lS" "-ln")))
       (if sudo-path
-          (let ((sudo-result (alpha-exec-program-sync sudo-path password flags))
+          (let ((sudo-result (alpha-sudo--exec-program-sync
+                              sudo-path password flags))
                 (result ()))
             (if (= 0 (car sudo-result))
                 (let ((lines (cdr (split-string (cadr sudo-result) "\n" t))))
@@ -225,7 +226,7 @@ The returned list can be empty of password PASSWORD is not provided."
 Returns a list containing the program exit code and output as string.
 PASSWORD can be passed as optional argument."
   (let ((flags (if password '("-S") '("-n"))))
-    (apply #'alpha-exec-program-sync
+    (apply #'alpha-sudo--exec-program-sync
            (append
             (list
              (alpha-sudo-abs-path)
@@ -238,7 +239,7 @@ Returns a list containing the program exit code and output as string.
 Password PASSWORD can be passed as optional argument.
 If SHELL is not provided, the user default shell is used."
   (let ((flags (if password "-S" "-n")))
-    (funcall #'alpha-shell-command-sync
+    (funcall #'alpha-sudo--shell-command-sync
            (string-join (list (alpha-sudo-abs-path) flags command) " ")
            password
            shell)))
@@ -250,7 +251,7 @@ When program terminates the CALLBACK function is called if not nil. The
 CALLBACK function receives as arguments the program exit code and output buffer.
 Password PASSWORD can be passed as optional argument."
   (let ((flags (if password '("-S" "-p" "") '("-n"))))
-    (apply #'alpha-exec-program-async
+    (apply #'alpha-sudo--exec-program-async
            (append
             (list
              (alpha-sudo-abs-path)
@@ -258,14 +259,15 @@ Password PASSWORD can be passed as optional argument."
              password)
             flags `(,program) args))))
 
-(defun alpha-sudo-shell-command-async (command callback &optional password shell)
+(defun alpha-sudo-shell-command-async (command callback &optional
+                                               password shell)
   "Execute asynchronously command COMMAND as root via SUDO.
 When command terminates the CALLBACK function is called if not nil. The
 CALLBACK function receives as arguments the command exit code and output buffer.
 Password PASSWORD can be passed as optional argument.
 If SHELL is not provided, the user default shell is used."
   (let ((flags (if password "-S -p \"\"" "-n")))
-    (funcall #'alpha-shell-command-async
+    (funcall #'alpha-sudo--shell-command-async
              (string-join (list (alpha-sudo-abs-path) flags command) " ")
              callback
              password
@@ -278,7 +280,7 @@ The password is requested only if needed."
     (let* ((fields (split-string program-and-args))
            (program (car fields))
            (args (cdr fields))
-           (path (alpha-program-abs-path program))
+           (path (alpha-sudo--program-abs-path program))
            (password nil))
       (if (not (and path
                     (alpha-sudo-can-run-program-p path)))
@@ -286,7 +288,8 @@ The password is requested only if needed."
         (when (alpha-sudo-require-password-p path)
           (setq password (read-passwd "Enter password: ")))
         (apply #'alpha-sudo-exec-program-async
-               (append (list path 'alpha-display-result-cb password) args)))))
+               (append (list path
+                             'alpha-sudo--display-result-cb password) args)))))
 
 (defun alpha-sudo-shell-command (command)
   "Execute command COMMAND as root via sudo.
@@ -294,7 +297,7 @@ The password is requested only if needed."
   (interactive "MShell command (root): ")
   (let* ((fields (split-string command))
          (program (car fields))
-         (path (alpha-program-abs-path program))
+         (path (alpha-sudo--program-abs-path program))
          (password nil))
     (if (not (and path
                   (alpha-sudo-can-run-program-p path)))
@@ -302,7 +305,7 @@ The password is requested only if needed."
       (when (alpha-sudo-require-password-p path)
         (setq password (read-passwd "Enter password: ")))
       (funcall #'alpha-sudo-shell-command-async command
-               'alpha-display-result-cb password))))
+               'alpha-sudo--display-result-cb password))))
 
 ;; Package provision
 
