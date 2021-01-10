@@ -14,34 +14,57 @@ This package exposes the following functions:
 
 * ```(alpha-sudo-shell-command COMMAND)```. This interactive function prompt 
 for the shell COMMAND to be executed via sudo. Additionally, if sudo requires 
-a password for the specified COMMAND, it also prompt the user for his password. 
+a password for the specified COMMAND, it also prompts the user for his password. 
 Then it executes the COMMAND via sudo asynchronously and displays the result 
 in the minibuffer or in a separate buffer, depending on lenght of the output.
+User default shell is used for the execution of COMMAND.
 
-* ```(alpha-sudo-exec COMMAND SENTINEL &optional PASSWORD)```. This
-non-interactive function executes the shell COMMAND asynchronously via sudo.
-If user PASSWORD is required to execute COMMAND via sudo, it shall be 
-provided as optional argument. At the end of the command exectution, the 
-SENTINEL function is called. The sentinel function has signature 
-```(sentinel PROGRAM EXITCODE OUTPUT)``` where:
+* ```(alpha-sudo-program PROGRAM-AND-ARGS)```. This interactive function prompt 
+for the program with arguments PROGRAM-AND-ARGS to be executed via sudo. 
+Additionally, if sudo requires a password for the specified program, it also
+prompts the user for his password.  Then it executes the program via sudo 
+asynchronously and displays the result in the minibuffer or in a separate
+buffer, depending on lenght of the output.
 
-    * PROGRAM is name of the program executed via sudo
+* ```(alpha-sudo-shell-command-async COMMAND CALLBACK &optional PASSWORD SHELL)```. 
+This non-interative function executes asynchronously shell command COMMAND as
+root via sudo. If user PASSWORD is required to execute PROGRAM via sudo, it 
+shall be provided as optional argument. At the end of COMMAND exectution, the 
+CALLBACK function is called if not nil. The callback function has signature
+```(callback EXITCODE BUFER)``` where:
 
-    * EXITCODE is the exitcode of the program
+    * EXITCODE is the exitcode of the program.
 
-    * OUTPUT is a string obtained by merging program stardard output and
-    standard error
+    * BUFFER is a buffer containing the program stardard output and
+standard error.
 
-* ```(alpha-sudo-exec-sync COMMAND &optional PASSWORD)```. This non-interative
-function executes the shell COMMAND synchronously via sudo. If user PASSWORD is
-required to execute COMMAND via sudo, it shall be provided as optional
-argument. This function returns a list with two elements: the process exit
-code and the process output. **WARNING:** this function frezzes Emacs for
-few seconds if the user password is required and the provided password is
-incorrect.
+* ```(alpha-sudo-exec-program-async PROGRAM CALLBACK &optional PASSWORD &rest ARGS)```. 
+This non-interative function executes asynchronously program PROGRAM with 
+arguments ARGS as root via sudo. If user PASSWORD is required to execute PROGRAM
+via sudo, it shall be provided as optional argument. At the end of program
+exectution, the CALLBACK function is called if not nil. The callback function 
+has signature ```(callback EXITCODE BUFER)``` where:
 
-* ```(alpha-sudo-allowed-programs)```. This non-interactive function returns an
-alist with two keys:
+    * EXITCODE is the exitcode of the program.
+
+    * BUFFER is a buffer containing the program stardard output and
+standard error.
+
+* ```(alpha-sudo-exec-program-sync PROGRAM &optional PASSWORD &rest ARGS)```. 
+This non-interative function executes synchronously program PROGRAM with 
+arguments ARGS as root via sudo. It returns a list containing the program exit
+code and output as string. If user PASSWORD is required to execute PROGRAM via
+sudo, it shall be provided as optional argument.
+
+* ```(alpha-sudo-shell-command-sync COMMAND &optional PASSWORD SHELL)```. 
+This non-interative function executes synchronously shell command COMMAND as
+root via sudo. It returns a list containing the program exit code and output
+as string. If user PASSWORD is required to execute PROGRAM via sudo, it shall be
+provided as optional argument. If SHELL is not provided, the user default shell
+is used.
+
+* ```(alpha-sudo-allowed-programs &optional PASSWORD)```. This non-interactive 
+function returns an alist with two keys:
 
     * *passwd* key, that is associated to the list of programs that can be 
     executed via sudo providing the user password. If the user can run any
@@ -53,29 +76,36 @@ alist with two keys:
     any command via sudo without providing his password, the list contains the
     sole "ALL" element.
 
+  If optional argument PASSWORD is not passed, the returned alist might be
+  empty depending on sudo configuration.
+
 * ```(alpha-sudo-can-p PROGRAM)```. This non-interactive function returns *t* 
 if the user can run PROGRAM via sudo, otherwise returns *nil*.
 
-* ```(alpha-sudo-require-password-p PROGRAM)```. This non-interactive function
-returns *t* if running PROGRAM via sudo requires the user password,
-returns *nil* if the user password is not required, and raises an error if
-the user cannor run PROGRAM via sudo.
+* ```(alpha-sudo-can-run-p)```. This non-interactive function returns *t* if 
+the user can run sudo, otherwise it returns *nil*.
 
-* ```(alpha-sudo-path)```. This non-interactive function returns the path of 
-sudo shell program. If the path of sudo cannot be found (sudo has to be in 
-user's path), this function returns *nil*.
+* ```(alpha-sudo-can-run-program-p PROGRAM &optional PASSWORD)```. This 
+non-interactive function returns *t* if the user can run PROGRAM program via
+sudo, *nil* if he cannot and *unknown* symbol if it is not possible to
+determine if the user can. Passing the optional argument PASSWORD allows to
+obtain always a known result, i.e. result can be only *t* or *nil*.
+
+* ```(alpha-sudo-require-password-p PROGRAM &optional PASSWORD)```. This 
+non-interactive function returns *t* if the password is required for running
+program PROGRAM, *nil* if it is not required and *unknown* symbol if it is not
+possible to determine if the password is required. Passing the optional argument
+PASSWORD allows to obtain always a known result, i.e. result can be only *t* or *nil*.
+
+* ```(alpha-sudo-abs-path)```. This non-interactive function returns the
+absolute path of sudo shell program. If the path of sudo cannot be found
+(sudo has to be in user's path), this function returns *nil*.
 
 ## Keybindings
 
 The package does not introduce any new keybinding. It is suggested to bind
 ```alpha-sudo-shell-command``` to a key for executing commands via sudo more
 quickly.
-
-## Notes
-
-At the moment this package has been tested on a limited setup and it is not
-guaranteed to work for every linux/configuration. If you encounter problems,
-please report them.
 
 ## Contact
 
