@@ -4,9 +4,9 @@
 
 ;; Author: Alpha Catharsis <alpha.catharsis@gmail.com>
 ;; Maintainer: Alpha Catharsis <alpha.catharsis@gmail.com>
-;; Version: 3.0.0
+;; Version: 3.0.1
 ;; Keywords: processes, unix
-;; URL: https://github.com/alpha-catharsis/sudo-utils.el
+;; URL: https://github.com/alpha-catharsis/sudo-utils
 ;; Package-Requires: ((emacs "25.1"))
 
 ;; This file is NOT part of GNU Emacs.
